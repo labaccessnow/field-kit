@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Field Kit
+GenericName=Network and security tools
+Comment=Subnet math, CVSS scoring, JWT decoding, defanging, cert checks — all local
+Exec=fieldkit
+Icon=com.labaccessnow.fieldkit
+Terminal=false
+Categories=Utility;
+Keywords=network;security;subnet;cidr;cvss;jwt;defang;hash;dns;tls;
+StartupNotify=true
+StartupWMClass=com.labaccessnow.fieldkit

@@ -83,6 +83,13 @@ def main():
     master.save(ico, sizes=[(16, 16), (24, 24), (32, 32), (48, 48),
                             (64, 64), (128, 128), (256, 256)])
 
+    # Linux hicolor set for the .deb / tarball packaging
+    lindir = os.path.join(root, 'linux/packaging/icons')
+    os.makedirs(lindir, exist_ok=True)
+    for px in (16, 24, 32, 48, 64, 128, 256, 512):
+        master.resize((px, px), Image.LANCZOS).save(
+            os.path.join(lindir, f'{px}.png'))
+
     # one big PNG for the sites / release page
     master.save(os.path.join(root, 'tool/icon-1024.png'))
     print('icons written')

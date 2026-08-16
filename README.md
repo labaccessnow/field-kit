@@ -5,8 +5,8 @@ sketchy websites for — subnet math, CVSS scoring, JWT decoding, defanging IOCs
 cert checks — in one window, running entirely on your machine.
 
 Built by [NetOps Field Notes](https://netopsfieldnotes.com) and
-[SecOps Field Notes](https://secopsfieldnotes.com). Windows and macOS, portable,
-no installer, no signup, no telemetry.
+[SecOps Field Notes](https://secopsfieldnotes.com). Windows, macOS and Linux —
+portable, no installer, no signup, no telemetry.
 
 ## The tools
 
@@ -33,10 +33,14 @@ no installer, no signup, no telemetry.
 
 ## Download
 
-Grab the latest zip from the [releases page](../../releases). Extract it
-anywhere and run — no installer, no admin rights, nothing written to the
-system. Delete the folder and it's gone. `SHA256SUMS` is published with every
-release if you want to verify the download.
+Grab the latest build from the [releases page](../../releases). `SHA256SUMS`
+is published with every release if you want to verify the download.
+
+- **Windows / macOS** — extract the zip anywhere and run. No installer, no
+  admin rights, nothing written to the system. Delete the folder and it's gone.
+- **Linux** — `sudo apt install ./fieldkit_<version>_amd64.deb` on
+  Debian/Ubuntu-family (desktop entry and icon included), or the tarball's
+  `./install.sh` for everything else — it stays inside `~/.local`, no root.
 
 ### The one-time unsigned-app prompt
 
