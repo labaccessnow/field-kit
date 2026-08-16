@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../logic/diff.dart';
 import '../logic/ipv4.dart';
+import '../logic/ipv6.dart';
 import '../logic/mtu.dart';
 import '../logic/xfer.dart';
 import '../theme.dart';
@@ -22,12 +23,23 @@ class _SubnetPageState extends State<SubnetPage> {
   VlsmPlan? plan;
   String? singleErr;
   SubnetInfo? single;
+  Subnet6Info? six;
 
   void _run() {
     setState(() {
       plan = null;
       single = null;
+      six = null;
       singleErr = null;
+      if (parent.text.contains(':')) {
+        final c6 = parseCidr6(parent.text);
+        if (c6 == null) {
+          singleErr = 'Could not read that as an IPv6 prefix (like 2001:db8::/48).';
+        } else {
+          six = subnet6Info(c6);
+        }
+        return;
+      }
       if (reqs.text.trim().isEmpty) {
         final p = parseCidr(parent.text);
         if (p.err != null) {
@@ -73,6 +85,17 @@ class _SubnetPageState extends State<SubnetPage> {
             maxLines: 10,
             onChanged: (_) => _run()),
         ErrText(singleErr ?? plan?.err),
+        if (six != null) ...[
+          KvTable([
+            ('Prefix', six!.cidr),
+            ('Expanded', six!.expanded),
+            ('First', six!.first),
+            ('Last', six!.last),
+            ('Addresses', six!.count),
+          ]),
+          const NoteText(
+              'IPv6 shown as prefix info — the VLSM planner below is IPv4 (v6 plans are usually straight /64s per segment).'),
+        ],
         if (single != null) ...[
           KvTable([
             ('Network', single!.cidr),
@@ -151,8 +174,36 @@ class AggregatePage extends StatefulWidget {
 class _AggregatePageState extends State<AggregatePage> {
   final input = TextEditingController();
   AggregateResult? res;
+  List<String> res6 = [];
+  String? err6;
 
-  void _run() => setState(() => res = aggregate(input.text));
+  void _run() => setState(() {
+        res6 = [];
+        err6 = null;
+        final toks = input.text
+            .split(RegExp(r'[\s,;]+'))
+            .map((t) => t.trim())
+            .where((t) => t.isNotEmpty)
+            .toList();
+        final v4 = toks.where((t) => !t.contains(':')).toList();
+        final v6 = toks.where((t) => t.contains(':')).toList();
+        res = v4.isEmpty ? null : aggregate(v4.join('\n'));
+        if (v6.isNotEmpty) {
+          final parsed = <Cidr6>[];
+          for (final t in v6) {
+            final c = parseCidr6(t.contains('/') ? t : '$t/128');
+            if (c == null) {
+              err6 = '"$t": not a valid IPv6 prefix.';
+              return;
+            }
+            parsed.add(c);
+          }
+          res6 = aggregate6(parsed);
+        }
+        if (v4.isEmpty && v6.isEmpty) {
+          res = aggregate(''); // reuse its empty-input error
+        }
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -169,14 +220,19 @@ class _AggregatePageState extends State<AggregatePage> {
             maxLines: 14),
         const SizedBox(height: 10),
         RunButton('Summarize', onPressed: _run, accent: _acc),
+        ErrText(err6),
         if (res != null) ...[
           ErrText(res!.err),
           if (res!.err == null) ...[
             OutCard(res!.list.join('\n'), color: _acc),
             NoteText(
-                '${res!.inCount} prefixes in → ${res!.list.length} out.'
+                '${res!.inCount} IPv4 prefixes in → ${res!.list.length} out.'
                 '${res!.notes.isEmpty ? '' : '\n${res!.notes.join('\n')}'}'),
           ],
+        ],
+        if (res6.isNotEmpty) ...[
+          const NoteText('IPv6'),
+          OutCard(res6.join('\n'), color: _acc),
         ],
       ],
     );

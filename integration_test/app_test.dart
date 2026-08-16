@@ -15,8 +15,14 @@ import 'package:integration_test/integration_test.dart';
 import 'package:fieldkit/main.dart';
 
 Future<void> openTool(WidgetTester tester, String name) async {
+  // The sidebar ListView is lazy AND scrollUntilVisible only sweeps downward,
+  // so start from the top every time: deterministic regardless of where the
+  // previous tool left the scroll position.
+  final scrollable = find.byType(Scrollable).first;
+  await tester.drag(scrollable, const Offset(0, 3000));
+  await tester.pumpAndSettle();
   final item = find.text(name);
-  await tester.ensureVisible(item);
+  await tester.scrollUntilVisible(item, 120, scrollable: scrollable);
   await tester.pumpAndSettle();
   await tester.tap(item);
   await tester.pumpAndSettle();
@@ -215,5 +221,65 @@ void main() {
     await tester.tap(find.text('Base64 → text'));
     await tester.pumpAndSettle();
     expect(textContains('Hello, World!'), findsWidgets);
+
+    // ---------- v1.1: Traceroute (loopback) ----------
+    await openTool(tester, 'Traceroute');
+    await typeInto(tester, fieldWithHint('host or IP'), '127.0.0.1');
+    await tester.tap(find.text('Trace').hitTestable());
+    await waitFor(tester, textContains('hops'),
+        timeout: const Duration(seconds: 45)); // "hops max" / "of 30 hops"
+
+    // ---------- v1.1: Whois (live, follows referrals) ----------
+    await openTool(tester, 'Whois');
+    await typeInto(tester, fieldWithHint('example.com or'), 'example.com');
+    await tester.tap(find.widgetWithText(FilledButton, 'Whois').hitTestable());
+    await waitFor(tester, textContains('===== whois.iana.org'),
+        timeout: const Duration(seconds: 40));
+
+    // ---------- v1.1: MAC / OUI (bundled IEEE registry) ----------
+    await openTool(tester, 'MAC / OUI lookup');
+    await typeInto(tester, fieldWithHint('28:6f:b9'), '28:6f:b9:00:00:01');
+    await waitFor(tester, textContains('Nokia'),
+        timeout: const Duration(seconds: 10));
+
+    // ---------- v1.1: IOC extractor (defanged in, defanged report out) ----------
+    await openTool(tester, 'IOC extractor');
+    await typeInto(tester, fieldWithHint('paste anything'),
+        'beacon hxxps[://]evil[.]example[.]com/g.php from 203[.]0[.]113[.]7, CVE-2026-1111');
+    await tester.tap(find.text('Extract').hitTestable());
+    await tester.pumpAndSettle();
+    expect(textContains('203[.]0[.]113[.]7'), findsWidgets);
+    expect(textContains('CVE-2026-1111'), findsWidgets);
+    expect(textContains('# URLs (1)'), findsWidgets);
+
+    // ---------- v1.1: Email header analyzer ----------
+    await openTool(tester, 'Email headers');
+    const hdr = 'Return-Path: <bounce@bulk.example.net>\n'
+        'Received: from edge.example.org (edge.example.org [198.51.100.7])'
+        ' by mx.dest.example; Sat, 16 Aug 2026 02:04:00 -0400\n'
+        'Received: from sender.example.net (sender.example.net [203.0.113.20])'
+        ' by edge.example.org; Sat, 16 Aug 2026 02:00:00 -0400\n'
+        'From: CEO <ceo@corp.example.com>\n'
+        'Subject: urgent wire\n'
+        'Authentication-Results: mx; spf=pass; dkim=fail; dmarc=pass\n';
+    await typeInto(tester, fieldWithHint('Received: from'), hdr);
+    await tester.tap(find.text('Analyze').hitTestable());
+    await tester.pumpAndSettle();
+    expect(textContains('203.0.113.20'), findsWidgets);
+    expect(textContains('pass / fail / pass'), findsWidgets);
+    expect(textContains('Return-Path'), findsWidgets);
+
+    // ---------- v1.1: IPv6 in the subnet + summarizer tools ----------
+    await openTool(tester, 'Subnet / VLSM');
+    await typeInto(tester, fieldWithHint('10.0.0.0/24'), '2001:db8::/64');
+    expect(textContains('2001:db8::ffff:ffff:ffff:ffff'), findsWidgets);
+
+    await openTool(tester, 'CIDR summarizer');
+    await typeInto(tester, fieldWithHint('10.1.0.0/24'),
+        '2001:db8::/33\n2001:db8:8000::/33\n10.9.0.0/24');
+    await tester.tap(find.text('Summarize').hitTestable());
+    await tester.pumpAndSettle();
+    expect(textContains('2001:db8::/32'), findsWidgets);
+    expect(textContains('10.9.0.0/24'), findsWidgets);
   });
 }

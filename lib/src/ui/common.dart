@@ -3,13 +3,23 @@ import 'package:flutter/services.dart';
 
 import '../theme.dart';
 
-void copyText(BuildContext context, String text) {
+void copyText(BuildContext context, String text, {String label = 'Copied'}) {
   Clipboard.setData(ClipboardData(text: text));
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
-    ..showSnackBar(const SnackBar(
-        content: Text('Copied'), duration: Duration(milliseconds: 700)));
+    ..showSnackBar(SnackBar(
+        content: Text(label), duration: const Duration(milliseconds: 700)));
 }
+
+String mdTable(List<(String, String)> rows) {
+  final buf = StringBuffer('| Field | Value |\n|---|---|\n');
+  for (final r in rows) {
+    buf.writeln('| ${r.$1} | ${r.$2.replaceAll('|', r'\|')} |');
+  }
+  return buf.toString();
+}
+
+String mdFence(String text) => '```\n$text\n```';
 
 /// Standard page frame: header + scrollable body, capped width.
 class ToolPage extends StatelessWidget {
@@ -77,11 +87,19 @@ class OutCard extends StatelessWidget {
         children: [
           Expanded(
               child: SelectableText(text, style: mono(color: color ?? ink))),
-          IconButton(
-            icon: const Icon(Icons.copy, size: 16, color: mut),
-            tooltip: 'Copy',
-            onPressed: () => copyText(context, text),
-          ),
+          Column(mainAxisSize: MainAxisSize.min, children: [
+            IconButton(
+              icon: const Icon(Icons.copy, size: 16, color: mut),
+              tooltip: 'Copy',
+              onPressed: () => copyText(context, text),
+            ),
+            IconButton(
+              icon: const Icon(Icons.notes, size: 16, color: mut),
+              tooltip: 'Copy as Markdown',
+              onPressed: () =>
+                  copyText(context, mdFence(text), label: 'Copied as Markdown'),
+            ),
+          ]),
         ],
       ),
     );
@@ -127,25 +145,43 @@ class KvTable extends StatelessWidget {
         border: Border.all(color: line),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Table(
-        columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        children: [
-          for (final r in rows)
-            TableRow(children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Text(r.$1,
-                    style: const TextStyle(color: mut, fontSize: 12.5)),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 18),
-                child: SelectableText(r.$2,
-                    style: mono(color: valueColor ?? ink)),
-              ),
-            ]),
-        ],
-      ),
+      child: Stack(children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 30),
+          child: Table(
+            columnWidths: const {
+              0: IntrinsicColumnWidth(),
+              1: FlexColumnWidth()
+            },
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            children: [
+              for (final r in rows)
+                TableRow(children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Text(r.$1,
+                        style: const TextStyle(color: mut, fontSize: 12.5)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 18),
+                    child: SelectableText(r.$2,
+                        style: mono(color: valueColor ?? ink)),
+                  ),
+                ]),
+            ],
+          ),
+        ),
+        Positioned(
+          top: -6,
+          right: -6,
+          child: IconButton(
+            icon: const Icon(Icons.notes, size: 15, color: mut),
+            tooltip: 'Copy as Markdown',
+            onPressed: () => copyText(context, mdTable(rows),
+                label: 'Copied as Markdown'),
+          ),
+        ),
+      ]),
     );
   }
 }

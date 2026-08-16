@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'theme.dart';
 import 'tools.dart';
 
-const appVersion = '1.0.0';
+const appVersion = '1.1.0';
 
 class Shell extends StatefulWidget {
   const Shell({super.key});
