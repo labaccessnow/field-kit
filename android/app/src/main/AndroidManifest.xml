@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The network tools need it. Flutter only adds INTERNET to debug builds,
+         so without this line every release build has no network at all. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="fieldkit"
+        android:label="Field Kit"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

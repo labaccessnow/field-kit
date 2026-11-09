@@ -21,6 +21,29 @@ String mdTable(List<(String, String)> rows) {
 
 String mdFence(String text) => '```\n$text\n```';
 
+/// Phone-width layout (the shell switches to a tool list below this width).
+const phoneWidth = 600.0;
+bool isNarrow(BuildContext context) =>
+    MediaQuery.sizeOf(context).width < phoneWidth;
+
+/// An input with its buttons: one line when there is room, wrapping onto
+/// more lines on a phone instead of overflowing.
+Widget inputRow(List<Widget> children) => Wrap(
+    spacing: 10,
+    runSpacing: 10,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: children);
+
+/// Set by the phone layout, where the tool's name is already in the app bar,
+/// so [ToolPage] skips its own title line.
+class TitleInAppBar extends InheritedWidget {
+  const TitleInAppBar({super.key, required super.child});
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<TitleInAppBar>() != null;
+  @override
+  bool updateShouldNotify(TitleInAppBar oldWidget) => false;
+}
+
 /// Standard page frame: header + scrollable body, capped width.
 class ToolPage extends StatelessWidget {
   final String title;
@@ -36,8 +59,15 @@ class ToolPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final narrow = isNarrow(context);
+    final showTitle = !TitleInAppBar.of(context);
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 40),
+      // Explicit padding switches off the automatic system inset, so add the
+      // bottom one back (Android gesture bar / iPhone home indicator).
+      padding: (narrow
+              ? const EdgeInsets.fromLTRB(16, 14, 16, 32)
+              : const EdgeInsets.fromLTRB(28, 24, 28, 40))
+          .copyWith(bottom: (narrow ? 32 : 40) + MediaQuery.paddingOf(context).bottom),
       child: Align(
         alignment: Alignment.topLeft,
         child: ConstrainedBox(
@@ -45,14 +75,18 @@ class ToolPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                Container(width: 4, height: 22, color: accent),
-                const SizedBox(width: 10),
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 21, fontWeight: FontWeight.w700)),
-              ]),
-              const SizedBox(height: 6),
+              if (showTitle) ...[
+                Row(children: [
+                  Container(width: 4, height: 22, color: accent),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(title,
+                        style: const TextStyle(
+                            fontSize: 21, fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+                const SizedBox(height: 6),
+              ],
               Text(subtitle, style: const TextStyle(color: mut, fontSize: 13.5)),
               const SizedBox(height: 18),
               ...children,

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../logic/pingtrace.dart';
 import '../theme.dart';
 import 'common.dart';
 
@@ -38,10 +39,24 @@ class _PingPageState extends State<PingPage> {
       out = '';
     });
     try {
-      final args = Platform.isWindows ? ['-n', '4', h] : ['-c', '4', h];
-      final r = await Process.run('ping', args)
-          .timeout(const Duration(seconds: 25));
-      if (mounted) setState(() => out = '${r.stdout}${r.stderr}'.trim());
+      String text;
+      if (Platform.isIOS) {
+        text = await tcpPing(h).timeout(const Duration(seconds: 25));
+      } else {
+        final args = Platform.isWindows ? ['-n', '4', h] : ['-c', '4', h];
+        try {
+          final r = await Process.run('ping', args)
+              .timeout(const Duration(seconds: 25));
+          text = '${r.stdout}${r.stderr}'.trim();
+        } on ProcessException {
+          if (!Platform.isAndroid) rethrow;
+          // Some Android builds block the ping binary: time TCP instead.
+          text = await tcpPing(h).timeout(const Duration(seconds: 25));
+        }
+      }
+      if (mounted) setState(() => out = text);
+    } on SocketException catch (e) {
+      if (mounted) setState(() => err = 'Could not reach $h: ${e.osError?.message ?? e.message}');
     } on TimeoutException {
       if (mounted) setState(() => err = 'Ping timed out.');
     } catch (e) {
@@ -55,14 +70,15 @@ class _PingPageState extends State<PingPage> {
   Widget build(BuildContext context) {
     return ToolPage(
       title: 'Ping',
-      subtitle: 'Four echoes via your system ping — reachability and latency at a glance.',
+      subtitle: Platform.isIOS
+          ? 'Four timed TCP connects to port 443. iPhone apps cannot send ICMP ping, so this times the TCP handshake (one round trip) instead.'
+          : 'Four echoes via your system ping — reachability and latency at a glance.',
       accent: _acc,
       children: [
-        Row(children: [
+        inputRow([
           SizedBox(
               width: 300,
               child: MonoField(controller: host, hint: 'host or IP')),
-          const SizedBox(width: 10),
           RunButton(running ? 'Pinging…' : 'Ping',
               onPressed: running ? () {} : _run, accent: _acc),
         ]),

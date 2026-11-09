@@ -3,8 +3,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'theme.dart';
 import 'tools.dart';
+import 'ui/common.dart';
 
 const appVersion = '1.1.0';
+const _sidebar = Color(0xFF081020);
 
 class Shell extends StatefulWidget {
   const Shell({super.key});
@@ -17,13 +19,14 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext context) {
+    if (isNarrow(context)) return _phone(context);
     return Scaffold(
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             width: 232,
-            color: const Color(0xFF081020),
+            color: _sidebar,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -80,6 +83,62 @@ class _ShellState extends State<Shell> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Phone: the tool list is the home screen and a tool opens full screen,
+  /// with its name in the app bar and a back button.
+  Widget _phone(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: _sidebar,
+        title: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Text('Field ', style: TextStyle(fontWeight: FontWeight.w800)),
+          Text('Kit',
+              style: TextStyle(fontWeight: FontWeight.w800, color: netGreen)),
+        ]),
+      ),
+      body: ListView(
+        padding: EdgeInsets.only(bottom: 24 + MediaQuery.paddingOf(context).bottom),
+        children: [
+          _groupLabel('NETWORK', netGreen),
+          for (var i = 0; i < tools.length; i++)
+            if (!tools[i].security) _phoneItem(context, i),
+          _groupLabel('SECURITY', secCyan),
+          for (var i = 0; i < tools.length; i++)
+            if (tools[i].security) _phoneItem(context, i),
+          const Divider(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _link('netopsfieldnotes.com'),
+                _link('secopsfieldnotes.com'),
+                _link('whatismynetip.com'),
+                const SizedBox(height: 6),
+                const Text('v$appVersion · free & open source',
+                    style: TextStyle(color: mut, fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _phoneItem(BuildContext context, int i) {
+    final t = tools[i];
+    return ListTile(
+      leading: Icon(t.icon, size: 20, color: t.security ? secCyan : netGreen),
+      title: Text(t.name, style: const TextStyle(fontSize: 15)),
+      trailing: const Icon(Icons.chevron_right, color: mut),
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(backgroundColor: _sidebar, title: Text(t.name)),
+          body: TitleInAppBar(child: t.page),
+        ),
+      )),
     );
   }
 

@@ -67,14 +67,13 @@ class _SubnetPageState extends State<SubnetPage> {
           'Leave the requests box empty for a plain subnet breakdown, or list subnets (one per line, "name: hosts" or "name: /26") to carve the block.',
       accent: _acc,
       children: [
-        Row(children: [
+        inputRow([
           SizedBox(
               width: 260,
               child: MonoField(
                   controller: parent,
                   hint: '10.0.0.0/24',
                   onChanged: (_) => _run())),
-          const SizedBox(width: 10),
           RunButton('Plan', onPressed: _run, accent: _acc),
         ]),
         const SizedBox(height: 10),
@@ -266,14 +265,13 @@ class _WildcardPageState extends State<WildcardPage> {
           'Give it a CIDR (10.20.0.0/16) or an address + wildcard pair (10.20.0.0 0.0.255.255) — get the other form plus a ready ACL line.',
       accent: _acc,
       children: [
-        Row(children: [
+        inputRow([
           SizedBox(
               width: 340,
               child: MonoField(
                   controller: input,
                   hint: '10.20.0.0/16   or   10.20.0.0 0.0.255.255',
                   onChanged: (_) => _run())),
-          const SizedBox(width: 10),
           RunButton('Convert', onPressed: _run, accent: _acc),
         ]),
         if (res != null) ...[
@@ -415,8 +413,11 @@ class _XferPageState extends State<XferPage> {
           _dd(rateUnits, rateUnit, (v) => setState(() => rateUnit = v)),
         ]),
         const SizedBox(height: 14),
-        Row(children: [
+        if (isNarrow(context))
           const Text('Protocol efficiency', style: TextStyle(color: mut, fontSize: 13)),
+        Row(children: [
+          if (!isNarrow(context))
+            const Text('Protocol efficiency', style: TextStyle(color: mut, fontSize: 13)),
           Expanded(
             child: Slider(
               value: eff, min: 50, max: 100, divisions: 50,
@@ -495,15 +496,23 @@ class _DiffPageState extends State<DiffPage> {
           'Compare two configs without pasting them into some website. Optionally skip comment lines (!, #, ;) and collapse whitespace.',
       accent: _acc,
       children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-              child: MonoField(
-                  controller: a, hint: 'before / running-config', minLines: 10, maxLines: 18)),
-          const SizedBox(width: 10),
-          Expanded(
-              child: MonoField(
-                  controller: b, hint: 'after / candidate config', minLines: 10, maxLines: 18)),
-        ]),
+        // Side by side on a desktop, stacked on a phone.
+        if (isNarrow(context)) ...[
+          MonoField(
+              controller: a, hint: 'before / running-config', minLines: 6, maxLines: 12),
+          const SizedBox(height: 10),
+          MonoField(
+              controller: b, hint: 'after / candidate config', minLines: 6, maxLines: 12),
+        ] else
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+                child: MonoField(
+                    controller: a, hint: 'before / running-config', minLines: 10, maxLines: 18)),
+            const SizedBox(width: 10),
+            Expanded(
+                child: MonoField(
+                    controller: b, hint: 'after / candidate config', minLines: 10, maxLines: 18)),
+          ]),
         const SizedBox(height: 8),
         Wrap(spacing: 16, crossAxisAlignment: WrapCrossAlignment.center, children: [
           _cb('Skip comment lines', dropComments, (v) => setState(() => dropComments = v)),
@@ -527,7 +536,7 @@ class _DiffPageState extends State<DiffPage> {
           value: val,
           activeColor: _acc,
           onChanged: (v) => onSel(v ?? false)),
-      Text(label, style: const TextStyle(color: mut, fontSize: 13)),
+      Flexible(child: Text(label, style: const TextStyle(color: mut, fontSize: 13))),
     ]);
   }
 

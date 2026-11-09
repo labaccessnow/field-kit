@@ -8,6 +8,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import '../logic/emailheader.dart';
 import '../logic/ioc.dart';
 import '../logic/oui.dart';
+import '../logic/pingtrace.dart';
 import '../theme.dart';
 import 'common.dart';
 
@@ -94,11 +95,10 @@ class _WhoisPageState extends State<WhoisPage> {
           'Raw whois over TCP/43, following referrals (IANA → registry → registrar, or ARIN for addresses). No website in the middle.',
       accent: netGreen,
       children: [
-        Row(children: [
+        inputRow([
           SizedBox(
               width: 320,
               child: MonoField(controller: input, hint: 'example.com or 203.0.113.9')),
-          const SizedBox(width: 10),
           RunButton(running ? 'Querying…' : 'Whois',
               onPressed: running ? () {} : _run, accent: netGreen),
         ]),
@@ -122,6 +122,7 @@ class _TrPageState extends State<TraceroutePage> {
   String? err;
   bool running = false;
   Process? _proc;
+  bool _stopped = false;
 
   Future<void> _run() async {
     final h = host.text.trim();
@@ -135,6 +136,14 @@ class _TrPageState extends State<TraceroutePage> {
       out = '';
     });
     try {
+      if (Platform.isAndroid) {
+        // No traceroute binary on Android: walk the path with ping TTLs.
+        await for (final line in pingTrace(h)) {
+          if (!mounted || _stopped) break;
+          setState(() => out += line);
+        }
+        return;
+      }
       Future<Process> start() {
         if (Platform.isWindows) {
           return Process.start('tracert', ['-d', '-w', '1000', h]);
@@ -166,6 +175,8 @@ class _TrPageState extends State<TraceroutePage> {
         setState(() =>
             err = 'Could not run traceroute (${e.message}). Is it installed?');
       }
+    } on SocketException catch (e) {
+      if (mounted) setState(() => err = 'Could not resolve $h: ${e.osError?.message ?? e.message}');
     } catch (e) {
       if (mounted) setState(() => err = 'Traceroute failed: $e');
     } finally {
@@ -176,6 +187,7 @@ class _TrPageState extends State<TraceroutePage> {
 
   @override
   void dispose() {
+    _stopped = true;
     _proc?.kill();
     super.dispose();
   }
@@ -184,14 +196,14 @@ class _TrPageState extends State<TraceroutePage> {
   Widget build(BuildContext context) {
     return ToolPage(
       title: 'Traceroute',
-      subtitle:
-          'The hop-by-hop path via your system traceroute, streamed as it goes. Numeric output — no reverse-DNS stalls.',
+      subtitle: Platform.isAndroid
+          ? 'The hop-by-hop path, found by pinging with TTL 1, 2, 3… and listing the router that answers at each step. Numeric output.'
+          : 'The hop-by-hop path via your system traceroute, streamed as it goes. Numeric output — no reverse-DNS stalls.',
       accent: netGreen,
       children: [
-        Row(children: [
+        inputRow([
           SizedBox(
               width: 300, child: MonoField(controller: host, hint: 'host or IP')),
-          const SizedBox(width: 10),
           RunButton(running ? 'Tracing…' : 'Trace',
               onPressed: running ? () {} : _run, accent: netGreen),
         ]),
@@ -300,14 +312,18 @@ class _IocPageState extends State<IocPage> {
             minLines: 8,
             maxLines: 16),
         const SizedBox(height: 10),
-        Row(children: [
+        inputRow([
           RunButton('Extract', onPressed: _run, accent: secCyan),
-          const SizedBox(width: 14),
-          Checkbox(
-              value: defangOut,
-              activeColor: secCyan,
-              onChanged: (v) => setState(() => defangOut = v ?? true)),
-          const Text('defang the output', style: TextStyle(color: mut, fontSize: 13)),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Checkbox(
+                value: defangOut,
+                activeColor: secCyan,
+                onChanged: (v) => setState(() => defangOut = v ?? true)),
+            const Flexible(
+              child: Text('defang the output',
+                  style: TextStyle(color: mut, fontSize: 13)),
+            ),
+          ]),
         ]),
         if (res != null) ...[
           NoteText(res!.total == 0

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'ui/live_pages.dart';
@@ -24,7 +26,9 @@ final tools = <Tool>[
   const Tool('Transfer time', Icons.schedule, XferPage(), security: _net),
   const Tool('Config diff', Icons.difference, DiffPage(), security: _net),
   const Tool('Ping', Icons.network_ping, PingPage(), security: _net),
-  const Tool('Traceroute', Icons.route, TraceroutePage(), security: _net),
+  // iPhone apps cannot send the probes traceroute needs, so it is not offered there.
+  if (!Platform.isIOS)
+    const Tool('Traceroute', Icons.route, TraceroutePage(), security: _net),
   const Tool('Port check', Icons.sensors, PortPage(), security: _net),
   const Tool('DNS lookup', Icons.dns, DnsPage(), security: _net),
   const Tool('Whois', Icons.badge_outlined, WhoisPage(), security: _net),

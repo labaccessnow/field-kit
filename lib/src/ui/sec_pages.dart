@@ -42,11 +42,10 @@ class _DefangPageState extends State<DefangPage> {
             minLines: 6,
             maxLines: 14),
         const SizedBox(height: 10),
-        Row(children: [
+        inputRow([
           RunButton('Defang',
               onPressed: () => setState(() => out = defang(input.text)),
               accent: _acc),
-          const SizedBox(width: 10),
           RunButton('Refang',
               onPressed: () => setState(() => out = refang(input.text)),
               accent: _acc,
@@ -147,14 +146,9 @@ class _CvssPageState extends State<CvssPage> {
   }
 
   Widget _metricRow(String k) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(children: [
-        SizedBox(
-            width: 170,
-            child: Text(cvssLabels[k]!,
-                style: const TextStyle(color: mut, fontSize: 13))),
-        Wrap(spacing: 6, children: [
+    final label = Text(cvssLabels[k]!,
+        style: const TextStyle(color: mut, fontSize: 13));
+    final chips = Wrap(spacing: 6, runSpacing: 6, children: [
           for (final opt in cvssMetrics[k]!)
             ChoiceChip(
               label: Text(cvssOptionNames[k]![opt]!,
@@ -168,8 +162,20 @@ class _CvssPageState extends State<CvssPage> {
               showCheckmark: false,
               onSelected: (_) => setState(() => metrics[k] = opt),
             ),
-        ]),
-      ]),
+        ]);
+    // Phone: label above its options. Wider: label column + options.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: isNarrow(context)
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              label,
+              const SizedBox(height: 4),
+              chips,
+            ])
+          : Row(children: [
+              SizedBox(width: 170, child: label),
+              Expanded(child: chips),
+            ]),
     );
   }
 }
@@ -350,9 +356,8 @@ class _HashPageState extends State<HashPage> {
             maxLines: 8,
             onChanged: (_) => _hashText()),
         const SizedBox(height: 10),
-        Row(children: [
+        inputRow([
           RunButton('Hash text', onPressed: _hashText, accent: _acc),
-          const SizedBox(width: 10),
           RunButton(hashing ? 'Hashing…' : 'Hash a file…',
               onPressed: hashing ? () {} : () => _hashFile(),
               accent: _acc,
