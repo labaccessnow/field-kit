@@ -1,6 +1,10 @@
 // Drives the real app and exercises every tool with a real input.
 //
 //   flutter test integration_test -d linux    (headless: under xvfb-run)
+//   flutter test integration_test -d <iPhone simulator udid | emulator-5554>
+//
+// Works in both layouts: the desktop sidebar and the phone tool list (each
+// tool is its own route there, so openTool goes back to the list first).
 //
 // The live-tool tests use 127.0.0.1, a listener the test opens itself, and
 // two stable public endpoints (example.com, 1.1.1.1 DoH) — they need outbound
@@ -14,10 +18,21 @@ import 'package:integration_test/integration_test.dart';
 
 import 'package:fieldkit/main.dart';
 
+/// True on a phone-sized window, where the app opens to a list of tools and
+/// each tool is its own full-screen route (see shell.dart).
+bool phoneLayout(WidgetTester tester) =>
+    tester.view.physicalSize.width / tester.view.devicePixelRatio < 600;
+
 Future<void> openTool(WidgetTester tester, String name) async {
-  // The sidebar ListView is lazy AND scrollUntilVisible only sweeps downward,
-  // so start from the top every time: deterministic regardless of where the
-  // previous tool left the scroll position.
+  // Phone: leave the current tool first, so the list is on screen again.
+  final back = find.byType(BackButton);
+  if (back.evaluate().isNotEmpty) {
+    await tester.tap(back.first);
+    await tester.pumpAndSettle();
+  }
+  // The list (sidebar or phone list) is lazy AND scrollUntilVisible only
+  // sweeps downward, so start from the top every time: deterministic
+  // regardless of where the previous tool left the scroll position.
   final scrollable = find.byType(Scrollable).first;
   await tester.drag(scrollable, const Offset(0, 3000));
   await tester.pumpAndSettle();
@@ -48,25 +63,49 @@ Future<void> waitFor(WidgetTester tester, Finder finder,
           'timed out after $timeout waiting for $finder\nvisible text: ${seen.join(" | ")}');
 }
 
-Finder textContains(String fragment) => find.byWidgetPredicate((w) {
-      String? data;
-      if (w is Text) data = w.data;
-      if (w is SelectableText) data = w.data;
-      if (data == null && w is RichText) data = w.text.toPlainText();
-      if (data == null && w is SelectableText && w.textSpan != null) {
-        data = w.textSpan!.toPlainText();
-      }
-      return data != null && data.contains(fragment);
+String? _textOf(Widget w) {
+  if (w is Text) return w.data ?? w.textSpan?.toPlainText();
+  if (w is SelectableText) return w.data ?? w.textSpan?.toPlainText();
+  if (w is RichText) return w.text.toPlainText();
+  return null;
+}
+
+Finder textContains(String fragment) => textContainsAny([fragment]);
+
+/// Matches a widget whose text contains any one of [fragments] — for results
+/// that legitimately differ by platform.
+Finder textContainsAny(List<String> fragments) => find.byWidgetPredicate((w) {
+      final data = _textOf(w);
+      return data != null && fragments.any(data.contains);
     });
+
+/// The hit-testable match of [finder], scrolling it into view first when it
+/// is not on screen: a phone's tool page scrolls, so its lower inputs and
+/// buttons start below the fold. Tries each match, because on desktop the
+/// IndexedStack also holds offstage twins of the same widget.
+Future<Finder> inView(WidgetTester tester, Finder finder) async {
+  var visible = finder.hitTestable();
+  for (final el in finder.evaluate()) {
+    if (visible.evaluate().isNotEmpty) break;
+    await tester.ensureVisible(find.byElementPredicate((e) => identical(e, el)));
+    await tester.pumpAndSettle();
+    visible = finder.hitTestable();
+  }
+  return visible;
+}
 
 /// IndexedStack keeps every page in the tree, so hint-based finders can match
 /// offstage twins on other pages — hitTestable() keeps only the visible one.
 Future<void> typeInto(WidgetTester tester, Finder field, String text) async {
-  final visible = field.hitTestable();
-  await tester.ensureVisible(visible);
-  await tester.pumpAndSettle();
+  final visible = await inView(tester, field);
   await tester.enterText(visible, text);
   await tester.pumpAndSettle();
+}
+
+/// Taps a button, scrolling it into view first. Callers pump afterwards as
+/// the tool needs: settle for instant tools, waitFor for network ones.
+Future<void> tapButton(WidgetTester tester, Finder button) async {
+  await tester.tap(await inView(tester, button));
 }
 
 Finder fieldWithHint(String hintFragment) => find.byWidgetPredicate((w) =>
@@ -79,9 +118,11 @@ void main() {
   testWidgets('every tool does its job on real input', (tester) async {
     await tester.pumpWidget(const FieldKitApp());
     await tester.pumpAndSettle();
+    // A phone opens to the tool list, a desktop to the first tool.
+    if (phoneLayout(tester)) await openTool(tester, 'Subnet / VLSM');
 
     // ---------- Subnet / VLSM ----------
-    // Default page. Plan a /24 split and check the biggest block lands first.
+    // Plan a /24 split and check the biggest block lands first.
     await typeInto(tester, fieldWithHint('10.0.0.0/24'), '192.0.2.0/24');
     await typeInto(
         tester, fieldWithHint('users: 100'), 'users: 100\nlinks: /30');
@@ -92,7 +133,7 @@ void main() {
     await openTool(tester, 'CIDR summarizer');
     await typeInto(
         tester, fieldWithHint('10.1.0.0/24'), '10.1.0.0/24\n10.1.1.0/24');
-    await tester.tap(find.text('Summarize'));
+    await tapButton(tester, find.text('Summarize'));
     await tester.pumpAndSettle();
     expect(textContains('10.1.0.0/23'), findsWidgets, reason: 'merged /23');
 
@@ -124,17 +165,19 @@ void main() {
         'interface Gi0/1\n ip address 192.0.2.1 255.255.255.0\n');
     await typeInto(tester, fieldWithHint('after / candidate config'),
         'interface Gi0/1\n ip address 192.0.2.99 255.255.255.0\n');
-    await tester.tap(find.text('Compare'));
+    await tapButton(tester, find.text('Compare'));
     await tester.pumpAndSettle();
     expect(textContains('2 changed lines'), findsWidgets);
 
     // ---------- Ping (system ping, loopback) ----------
     await openTool(tester, 'Ping');
     await typeInto(tester, fieldWithHint('host or IP'), '127.0.0.1');
-    await tester.tap(find.widgetWithText(FilledButton, 'Ping').hitTestable());
+    await tapButton(tester, find.widgetWithText(FilledButton, 'Ping'));
     // 'from 127.0.0.1' only appears in real ping output (Linux "64 bytes from",
     // Windows "Reply from") — the bare IP would also match the input field.
-    await waitFor(tester, textContains('from 127.0.0.1'),
+    // iPhone (and an Android build without a ping binary) times TCP connects
+    // instead and reports "4/4 answered".
+    await waitFor(tester, textContainsAny(['from 127.0.0.1', '/4 answered']),
         timeout: const Duration(seconds: 30));
 
     // ---------- Port check (against our own listener) ----------
@@ -143,21 +186,21 @@ void main() {
     await typeInto(
         tester, fieldWithHint('host or IP'), '127.0.0.1');
     await typeInto(tester, fieldWithHint('22, 80, 443'), '${listener.port}');
-    await tester.tap(find.text('Check'));
+    await tapButton(tester, find.text('Check'));
     await waitFor(tester, textContains('OPEN'));
     await listener.close();
 
     // ---------- DNS lookup (system + DoH) ----------
     await openTool(tester, 'DNS lookup');
     await typeInto(tester, fieldWithHint('example.com'), 'example.com');
-    await tester.tap(find.text('Look up').hitTestable());
+    await tapButton(tester, find.text('Look up'));
     await tester.pump(const Duration(milliseconds: 300));
     await waitFor(tester, textContains('DNS over HTTPS'));
 
     // ---------- TLS certificate ----------
     await openTool(tester, 'TLS certificate');
     await typeInto(tester, fieldWithHint('example.com'), 'example.com');
-    await tester.tap(find.text('Inspect'));
+    await tapButton(tester, find.text('Inspect'));
     await waitFor(tester, find.text('Issuer'));
     expect(textContains('Days left'), findsWidgets);
 
@@ -167,14 +210,14 @@ void main() {
 
     // ---------- Public IP (our own service) ----------
     await openTool(tester, 'Public IP');
-    await tester.tap(find.text('Check my public IP'));
+    await tapButton(tester, find.text('Check my public IP'));
     await waitFor(tester, find.text('ip'));
 
     // ---------- Defang / refang ----------
     await openTool(tester, 'Defang / refang');
     await typeInto(tester, fieldWithHint('malicious.example.com'),
         'https://bad.example.com/x.php from 203.0.113.9');
-    await tester.tap(find.text('Defang'));
+    await tapButton(tester, find.text('Defang'));
     await tester.pumpAndSettle();
     expect(textContains('hxxps[://]bad[.]example[.]com'), findsWidgets);
     expect(textContains('203[.]0[.]113[.]9'), findsWidgets);
@@ -183,7 +226,7 @@ void main() {
     await openTool(tester, 'CVSS calculator');
     await typeInto(tester, fieldWithHint('CVSS:3.1/'),
         'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H');
-    await tester.tap(find.text('Parse'));
+    await tapButton(tester, find.text('Parse'));
     await tester.pumpAndSettle();
     expect(find.text('9.8'), findsOneWidget);
     expect(find.text('Critical'), findsOneWidget);
@@ -218,21 +261,24 @@ void main() {
     // ---------- Decoder workbench ----------
     await openTool(tester, 'Decoder workbench');
     await typeInto(tester, fieldWithHint('cG93ZXJzaGVsbCA'), 'SGVsbG8sIFdvcmxkIQ==');
-    await tester.tap(find.text('Base64 → text'));
+    await tapButton(tester, find.text('Base64 → text'));
     await tester.pumpAndSettle();
     expect(textContains('Hello, World!'), findsWidgets);
 
     // ---------- v1.1: Traceroute (loopback) ----------
-    await openTool(tester, 'Traceroute');
-    await typeInto(tester, fieldWithHint('host or IP'), '127.0.0.1');
-    await tester.tap(find.text('Trace').hitTestable());
-    await waitFor(tester, textContains('hops'),
-        timeout: const Duration(seconds: 45)); // "hops max" / "of 30 hops"
+    // Not offered on iPhone (apps there cannot send the probes).
+    if (!Platform.isIOS) {
+      await openTool(tester, 'Traceroute');
+      await typeInto(tester, fieldWithHint('host or IP'), '127.0.0.1');
+      await tapButton(tester, find.text('Trace'));
+      await waitFor(tester, textContains('hops'),
+          timeout: const Duration(seconds: 45)); // "hops max" / "of 30 hops"
+    }
 
     // ---------- v1.1: Whois (live, follows referrals) ----------
     await openTool(tester, 'Whois');
     await typeInto(tester, fieldWithHint('example.com or'), 'example.com');
-    await tester.tap(find.widgetWithText(FilledButton, 'Whois').hitTestable());
+    await tapButton(tester, find.widgetWithText(FilledButton, 'Whois'));
     await waitFor(tester, textContains('===== whois.iana.org'),
         timeout: const Duration(seconds: 40));
 
@@ -246,7 +292,7 @@ void main() {
     await openTool(tester, 'IOC extractor');
     await typeInto(tester, fieldWithHint('paste anything'),
         'beacon hxxps[://]evil[.]example[.]com/g.php from 203[.]0[.]113[.]7, CVE-2026-1111');
-    await tester.tap(find.text('Extract').hitTestable());
+    await tapButton(tester, find.text('Extract'));
     await tester.pumpAndSettle();
     expect(textContains('203[.]0[.]113[.]7'), findsWidgets);
     expect(textContains('CVE-2026-1111'), findsWidgets);
@@ -263,7 +309,7 @@ void main() {
         'Subject: urgent wire\n'
         'Authentication-Results: mx; spf=pass; dkim=fail; dmarc=pass\n';
     await typeInto(tester, fieldWithHint('Received: from'), hdr);
-    await tester.tap(find.text('Analyze').hitTestable());
+    await tapButton(tester, find.text('Analyze'));
     await tester.pumpAndSettle();
     expect(textContains('203.0.113.20'), findsWidgets);
     expect(textContains('pass / fail / pass'), findsWidgets);
@@ -277,7 +323,7 @@ void main() {
     await openTool(tester, 'CIDR summarizer');
     await typeInto(tester, fieldWithHint('10.1.0.0/24'),
         '2001:db8::/33\n2001:db8:8000::/33\n10.9.0.0/24');
-    await tester.tap(find.text('Summarize').hitTestable());
+    await tapButton(tester, find.text('Summarize'));
     await tester.pumpAndSettle();
     expect(textContains('2001:db8::/32'), findsWidgets);
     expect(textContains('10.9.0.0/24'), findsWidgets);
