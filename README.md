@@ -43,6 +43,7 @@ is published with every release if you want to verify the download.
 
 - **Windows / macOS** — extract the zip anywhere and run. No installer, no
   admin rights, nothing written to the system. Delete the folder and it's gone.
+  The Mac build needs macOS 12 or later.
 - **Linux** — `sudo apt install ./fieldkit_<version>_amd64.deb` on
   Debian/Ubuntu-family (desktop entry and icon included), or the tarball's
   `./install.sh` for everything else — it stays inside `~/.local`, no root.
