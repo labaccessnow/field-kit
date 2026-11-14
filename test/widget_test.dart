@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:fieldkit/main.dart';
+import 'package:fieldkit/src/shell.dart' show appVersion;
 
 // The sidebar is a lazy ListView — items near the bottom are not built until
 // scrolled near, so every lookup scrolls first.
@@ -12,6 +15,13 @@ Future<void> showItem(WidgetTester tester, String name) async {
 }
 
 void main() {
+  test('the version in the footer is the one in pubspec.yaml', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final v = RegExp(r'^version:\s*([0-9.]+)\+', multiLine: true)
+        .firstMatch(pubspec)![1];
+    expect(appVersion, v);
+  });
+
   testWidgets('shell renders all tools and switches pages', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1.0;
@@ -23,6 +33,9 @@ void main() {
     // Sidebar groups and a few entries.
     expect(find.text('NETWORK'), findsOneWidget);
     expect(find.text('Subnet / VLSM'), findsOneWidget);
+
+    // The footer links to the privacy policy (both stores require it in-app).
+    expect(find.text('Privacy policy'), findsOneWidget);
 
     // Default page is the subnet tool with its initial /24 result.
     expect(find.text('Subnet calculator / VLSM splitter'), findsOneWidget);

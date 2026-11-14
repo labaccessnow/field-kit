@@ -72,7 +72,12 @@ port check and the TLS inspector talk to the host you point them at, whois
 asks the public whois servers, DNS lookup also
 queries 1.1.1.1 over HTTPS, and the public-IP check calls
 [whatismynetip.com](https://whatismynetip.com). No analytics, no update
-phone-home, nothing else.
+phone-home, nothing else. On an IPv6-only network (plenty of phone carriers
+run one) an IPv4 address is reached through the network's NAT64 gateway, and
+finding it takes one resolver question for `ipv4only.arpa`.
+
+The same thing in policy form:
+[privacy policy](https://netopsfieldnotes.com/tools/fieldkit/privacy/).
 
 ## Building from source
 
@@ -80,7 +85,7 @@ It's a standard Flutter app:
 
 ```bash
 flutter pub get
-flutter test          # 167 tests, including the CVSS/RFC vectors and phone layouts
+flutter test          # 186 tests, including the CVSS/RFC vectors and phone layouts
 flutter build windows # or: macos / linux / apk
 ```
 

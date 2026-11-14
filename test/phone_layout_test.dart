@@ -47,6 +47,12 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
       expect(find.text('NETWORK'), findsOneWidget);
+      // The privacy link sits under the list.
+      await tester.scrollUntilVisible(find.text('Privacy policy'), 300,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('Privacy policy'), findsOneWidget);
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 5000));
+      await tester.pumpAndSettle();
       // Opening a tool pushes it full screen with a back button.
       await tester.tap(find.text('Subnet / VLSM'));
       await tester.pumpAndSettle();

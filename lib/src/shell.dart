@@ -5,7 +5,8 @@ import 'theme.dart';
 import 'tools.dart';
 import 'ui/common.dart';
 
-const appVersion = '1.1.0';
+const appVersion = '1.2.1';
+const privacyUrl = 'https://netopsfieldnotes.com/tools/fieldkit/privacy/';
 const _sidebar = Color(0xFF081020);
 
 class Shell extends StatefulWidget {
@@ -65,6 +66,7 @@ class _ShellState extends State<Shell> {
                       _link('netopsfieldnotes.com'),
                       _link('secopsfieldnotes.com'),
                       _link('whatismynetip.com'),
+                      _link('Privacy policy', url: privacyUrl),
                       const SizedBox(height: 6),
                       const Text('v$appVersion · free & open source',
                           style: TextStyle(color: mut, fontSize: 11)),
@@ -116,6 +118,7 @@ class _ShellState extends State<Shell> {
                 _link('netopsfieldnotes.com'),
                 _link('secopsfieldnotes.com'),
                 _link('whatismynetip.com'),
+                _link('Privacy policy', url: privacyUrl),
                 const SizedBox(height: 6),
                 const Text('v$appVersion · free & open source',
                     style: TextStyle(color: mut, fontSize: 11)),
@@ -177,11 +180,13 @@ class _ShellState extends State<Shell> {
     );
   }
 
-  Widget _link(String host) => InkWell(
-        onTap: () => launchUrl(Uri.parse('https://$host/')),
+  /// A footer link. [label] is the site's host name unless [url] says where
+  /// it goes.
+  Widget _link(String label, {String? url}) => InkWell(
+        onTap: () => launchUrl(Uri.parse(url ?? 'https://$label/')),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Text(host,
+          child: Text(label,
               style: const TextStyle(color: mut, fontSize: 11.5)),
         ),
       );

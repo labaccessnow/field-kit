@@ -2,7 +2,7 @@ name: fieldkit
 description: "Field Kit — free network & security tools for engineers. Runs entirely on your machine."
 publish_to: 'none'
 
-version: 1.2.0+3
+version: 1.2.1+4
 
 environment:
   sdk: ^3.12.2
