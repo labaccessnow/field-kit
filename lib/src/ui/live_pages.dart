@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../logic/netdial.dart';
 import '../logic/pingtrace.dart';
 import '../theme.dart';
 import 'common.dart';
@@ -132,7 +133,7 @@ class _PortPageState extends State<PortPage> {
       final sw = Stopwatch()..start();
       String line;
       try {
-        final s = await Socket.connect(h, p, timeout: const Duration(seconds: 4));
+        final s = await dial(h, p, timeout: const Duration(seconds: 4));
         sw.stop();
         s.destroy();
         line = 'tcp/$p   OPEN     ${sw.elapsedMilliseconds} ms';
@@ -316,14 +317,12 @@ class _TlsPageState extends State<TlsPage> {
     SecureSocket? s;
     var trusted = true;
     try {
+      const wait = Duration(seconds: 8);
       try {
-        s = await SecureSocket.connect(h, p,
-            timeout: const Duration(seconds: 8));
+        s = await dialTls(h, p, timeout: wait);
       } on HandshakeException {
         trusted = false;
-        s = await SecureSocket.connect(h, p,
-            timeout: const Duration(seconds: 8),
-            onBadCertificate: (_) => true);
+        s = await dialTls(h, p, timeout: wait, anyCert: true);
       }
       final c = s.peerCertificate;
       if (!mounted) return;

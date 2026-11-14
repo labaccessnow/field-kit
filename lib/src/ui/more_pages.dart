@@ -7,6 +7,7 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import '../logic/emailheader.dart';
 import '../logic/ioc.dart';
+import '../logic/netdial.dart';
 import '../logic/oui.dart';
 import '../logic/pingtrace.dart';
 import '../theme.dart';
@@ -26,8 +27,7 @@ class _WhoisPageState extends State<WhoisPage> {
   bool running = false;
 
   static Future<String> _query(String server, String q) async {
-    final s = await Socket.connect(server, 43,
-        timeout: const Duration(seconds: 8));
+    final s = await dial(server, 43, timeout: const Duration(seconds: 8));
     s.write('$q\r\n');
     final bytes = <int>[];
     await s

@@ -10,6 +10,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'netdial.dart';
+
 /// One TTL-limited ping, parsed.
 class TtlProbe {
   /// Address that answered; null = no answer within the timeout.
@@ -56,10 +58,16 @@ String hopLine(int ttl, TtlProbe p) {
 }
 
 /// Prefers an IPv4 address (what most people expect to see traced).
-Future<InternetAddress> resolvePreferV4(String host) async {
-  final addrs = await InternetAddress.lookup(host);
-  return addrs.firstWhere((a) => a.type == InternetAddressType.IPv4,
-      orElse: () => addrs.first);
+Future<InternetAddress> resolvePreferV4(String host) async =>
+    (await _addresses(host)).first;
+
+/// Every address of [host], IPv4 ones first.
+Future<List<InternetAddress>> _addresses(String host, {Lookup? lookup}) async {
+  final addrs = await (lookup ?? InternetAddress.lookup)(host);
+  return [
+    ...addrs.where((a) => a.type == InternetAddressType.IPv4),
+    ...addrs.where((a) => a.type != InternetAddressType.IPv4),
+  ];
 }
 
 /// Android traceroute: one ping per TTL, streamed a line at a time.
@@ -84,35 +92,73 @@ Stream<String> pingTrace(
 
 /// iPhone "ping": [count] TCP connects to [port], timed.
 /// A refused connection still counts: the host answered (port closed).
+///
+/// On an IPv6-only network an IPv4 address has no route. The first attempt
+/// then moves to the host's IPv6 address, or to the NAT64 form of the IPv4
+/// one, and the remaining attempts stay there.
 Future<String> tcpPing(String host,
     {int port = 443,
     int count = 4,
     Duration gap = const Duration(milliseconds: 500),
-    Duration timeout = const Duration(seconds: 3)}) async {
-  final addr = await resolvePreferV4(host);
-  final out = StringBuffer('TCP connect to $host (${addr.address}) port $port\n');
+    Duration timeout = const Duration(seconds: 3),
+    Lookup? lookup,
+    Connect? connect}) async {
+  final open = connect ?? systemConnect;
+  final addrs = await _addresses(host, lookup: lookup);
+  var addr = addrs.first;
+  InternetAddress? nat64Of;
+  final lines = <String>[];
   final times = <double>[];
-  for (var i = 1; i <= count; i++) {
+
+  // One timed connect. Returns the error when the address had no route.
+  Future<SocketException?> attempt(int i) async {
     final sw = Stopwatch()..start();
     try {
-      final s = await Socket.connect(addr, port, timeout: timeout);
+      final s = await open(addr, port, timeout: timeout);
       sw.stop();
       s.destroy();
       times.add(sw.elapsedMicroseconds / 1000);
-      out.writeln('seq=$i  time=${times.last.toStringAsFixed(1)} ms');
+      lines.add('seq=$i  time=${times.last.toStringAsFixed(1)} ms');
     } on SocketException catch (e) {
       sw.stop();
+      if (noRoute(e)) return e;
       final msg = e.osError?.message ?? e.message;
       if (msg.toLowerCase().contains('refused')) {
         times.add(sw.elapsedMicroseconds / 1000);
-        out.writeln(
+        lines.add(
             'seq=$i  time=${times.last.toStringAsFixed(1)} ms  (refused: host answered, port $port closed)');
       } else {
-        out.writeln('seq=$i  no answer ($msg)');
+        lines.add('seq=$i  no answer ($msg)');
       }
+    }
+    return null;
+  }
+
+  for (var i = 1; i <= count; i++) {
+    var unroutable = await attempt(i);
+    if (unroutable != null && i == 1 && addr.type == InternetAddressType.IPv4) {
+      final v6 = addrs.where((a) => a.type == InternetAddressType.IPv6);
+      final other =
+          v6.isNotEmpty ? v6.first : await nat64For(addr, lookup: lookup);
+      if (other != null) {
+        if (v6.isEmpty) nat64Of = addr;
+        addr = other;
+        unroutable = await attempt(i);
+      }
+    }
+    if (unroutable != null) {
+      lines.add(
+          'seq=$i  no answer (${unroutable.osError?.message ?? unroutable.message})');
     }
     if (i < count) await Future<void>.delayed(gap);
   }
+
+  final out = StringBuffer('TCP connect to $host (${addr.address}) port $port\n');
+  if (nat64Of != null) {
+    out.writeln(
+        'IPv6-only network: reaching ${nat64Of.address} through its NAT64 address.');
+  }
+  lines.forEach(out.writeln);
   out.write('\n${times.length}/$count answered');
   if (times.isNotEmpty) {
     final avg = times.reduce((a, b) => a + b) / times.length;
