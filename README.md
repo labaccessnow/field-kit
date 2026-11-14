@@ -85,7 +85,7 @@ It's a standard Flutter app:
 
 ```bash
 flutter pub get
-flutter test          # 186 tests, including the CVSS/RFC vectors and phone layouts
+flutter test          # 187 tests, including the CVSS/RFC vectors and phone layouts
 flutter build windows # or: macos / linux / apk
 ```
 

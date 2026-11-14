@@ -65,5 +65,7 @@ ThemeData fieldKitTheme() {
       width: 200,
     ),
     dividerColor: line,
+    // Material 3 dividers read this, not dividerColor.
+    dividerTheme: const DividerThemeData(color: line),
   );
 }

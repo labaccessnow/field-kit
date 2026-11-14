@@ -25,62 +25,72 @@ class _ShellState extends State<Shell> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // On a tablet the sidebar colour runs under the status bar while
+          // its contents stay clear of it (SafeArea is a no-op on desktop).
           Container(
-            width: 232,
+            width: 232 + MediaQuery.paddingOf(context).left,
             color: _sidebar,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-                  child: Row(children: [
-                    const Text('Field ',
-                        style: TextStyle(
-                            fontSize: 19, fontWeight: FontWeight.w800)),
-                    const Text('Kit',
-                        style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            color: netGreen)),
-                  ]),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    children: [
-                      _groupLabel('NETWORK', netGreen),
-                      for (var i = 0; i < tools.length; i++)
-                        if (!tools[i].security) _item(i),
-                      _groupLabel('SECURITY', secCyan),
-                      for (var i = 0; i < tools.length; i++)
-                        if (tools[i].security) _item(i),
-                    ],
+            child: SafeArea(
+              right: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+                    child: Row(children: [
+                      const Text('Field ',
+                          style: TextStyle(
+                              fontSize: 19, fontWeight: FontWeight.w800)),
+                      const Text('Kit',
+                          style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              color: netGreen)),
+                    ]),
                   ),
-                ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _link('netopsfieldnotes.com'),
-                      _link('secopsfieldnotes.com'),
-                      _link('whatismynetip.com'),
-                      _link('Privacy policy', url: privacyUrl),
-                      const SizedBox(height: 6),
-                      const Text('v$appVersion · free & open source',
-                          style: TextStyle(color: mut, fontSize: 11)),
-                    ],
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      children: [
+                        _groupLabel('NETWORK', netGreen),
+                        for (var i = 0; i < tools.length; i++)
+                          if (!tools[i].security) _item(i),
+                        _groupLabel('SECURITY', secCyan),
+                        for (var i = 0; i < tools.length; i++)
+                          if (tools[i].security) _item(i),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _link('netopsfieldnotes.com'),
+                        _link('secopsfieldnotes.com'),
+                        _link('whatismynetip.com'),
+                        _link('Privacy policy', url: privacyUrl),
+                        const SizedBox(height: 6),
+                        const Text('v$appVersion · free & open source',
+                            style: TextStyle(color: mut, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const VerticalDivider(width: 1),
           Expanded(
-            child: IndexedStack(
-              index: selected,
-              children: [for (final t in tools) t.page],
+            // Tool pages add their own bottom inset, so leave that one alone.
+            child: SafeArea(
+              left: false,
+              bottom: false,
+              child: IndexedStack(
+                index: selected,
+                children: [for (final t in tools) t.page],
+              ),
             ),
           ),
         ],

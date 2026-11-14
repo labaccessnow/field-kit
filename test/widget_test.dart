@@ -22,6 +22,25 @@ void main() {
     expect(appVersion, v);
   });
 
+  testWidgets('wide layout stays clear of a tablet status bar', (tester) async {
+    tester.view.physicalSize = const Size(1032, 1376);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.padding = const FakeViewPadding(top: 32, bottom: 20);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const FieldKitApp());
+    await tester.pumpAndSettle();
+
+    // Sidebar title and the open tool's title both start below the bar.
+    expect(tester.getTopLeft(find.text('Field ')).dy, greaterThanOrEqualTo(32));
+    expect(
+        tester.getTopLeft(find.text('Subnet calculator / VLSM splitter')).dy,
+        greaterThanOrEqualTo(32));
+    // The footer sits above the home indicator.
+    expect(tester.getBottomLeft(find.textContaining('free & open source')).dy,
+        lessThanOrEqualTo(1376 - 20));
+  });
+
   testWidgets('shell renders all tools and switches pages', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1.0;
